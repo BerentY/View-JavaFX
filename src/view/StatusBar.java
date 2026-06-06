@@ -14,7 +14,7 @@ import javafx.scene.layout.Region;
 
 /**
  * Ekranın alt kısmında yer alan durum çubuğu.
- * Batarya, süre ve temizlik yüzdesi gibi anlık bilgileri gösterir.
+ * Batarya, süre, alan istatistikleri ve temizlik yüzdesi gibi anlık bilgileri gösterir.
  */
 public class StatusBar extends HBox implements Interfaces.SimulationObserver {
 
@@ -22,6 +22,10 @@ public class StatusBar extends HBox implements Interfaces.SimulationObserver {
     private Label lblTime;
     private Label lblBattery;
     private Label lblCleaned;
+
+    // YENİ: Ödev dokümanında zorunlu tutulan alan etiketleri
+    private Label lblTotalArea;
+    private Label lblRemainingArea;
 
     public StatusBar() {
         setPrefHeight(Constants.STATUS_BAR_HEIGHT);
@@ -38,6 +42,10 @@ public class StatusBar extends HBox implements Interfaces.SimulationObserver {
         lblStatus = new Label("Durum: Hazır");
         lblStatus.setStyle("-fx-font-weight: bold; -fx-text-fill: #37474F;");
 
+        // YENİ: Toplam alan göstergesi (Görsel taslakla tam uyumlu formatta)
+        lblTotalArea = new Label("Toplam Alan: 0 m²");
+        lblTotalArea.setStyle("-fx-font-weight: bold; -fx-text-fill: #455A64;");
+
         lblTime = new Label("Süre: 00:00");
         lblTime.setStyle("-fx-font-weight: bold;");
 
@@ -47,12 +55,17 @@ public class StatusBar extends HBox implements Interfaces.SimulationObserver {
         lblCleaned = new Label("Temizlenen: %0.0");
         lblCleaned.setStyle("-fx-font-weight: bold;");
 
-        // Durum etiketi sol tarafta, diğer istatistikler sağ tarafta kalsın diye
-        // araya görünmez, genişleyebilen bir yay (spacer) ekliyoruz.
+        // YENİ: Kalan kirli alan göstergesi
+        lblRemainingArea = new Label("Kalan Alan: 0 m² (%100.0)");
+        lblRemainingArea.setStyle("-fx-font-weight: bold; -fx-text-fill: #5D4037;");
+
+        // Durum etiketleri sol tarafta, istatistikler sağ tarafta düzgünce hizalansın diye
+        // araya genişleyebilen görünmez bir ayırıcı ekliyoruz.
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        getChildren().addAll(lblStatus, spacer, lblTime, lblBattery, lblCleaned);
+        // Yeni etiketlerimizi de düzene dahil ediyoruz
+        getChildren().addAll(lblStatus, lblTotalArea, spacer, lblTime, lblBattery, lblCleaned, lblRemainingArea);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -66,11 +79,16 @@ public class StatusBar extends HBox implements Interfaces.SimulationObserver {
             lblTime.setText("Süre: " + state.getFormattedTime());
 
             lblBattery.setText("Batarya: %" + state.getBattery());
-            // Batarya rengini Controller'ın belirlediği SimulationState üzerinden alıyoruz
             lblBattery.setStyle("-fx-font-weight: bold; -fx-text-fill: " + state.getBatteryColor() + ";");
 
-            // Yüzdeyi virgülden sonra tek haneli gösterecek şekilde formatlıyoruz
+            // Temizlenen ve Kalan alan yüzdelerini anlık hesaplayarak yazdırıyoruz
             lblCleaned.setText(String.format("Temizlenen: %%%.1f", state.getCleanedPercentage()));
+
+            // GÜNCELLEME: Toplam ve Kalan alan metriklerini canlı verilerle besle
+            lblTotalArea.setText(String.format("Toplam Alan: %d m²", state.getTotalCells()));
+            lblRemainingArea.setText(String.format("Kalan Alan: %d m² (%%%.1f)",
+                    state.getDirtyCells(),
+                    state.getDirtyPercentage()));
         });
     }
 
@@ -94,10 +112,22 @@ public class StatusBar extends HBox implements Interfaces.SimulationObserver {
         Platform.runLater(() -> lblStatus.setText("Durum: Temizlik Bitti!"));
     }
 
+    @Override
+    public void onSimulationReset() {
+        Platform.runLater(() -> {
+            lblStatus.setText("Durum: Hazır");
+            lblTime.setText("Süre: 00:00");
+            lblBattery.setText("Batarya: %100");
+            lblBattery.setStyle("-fx-font-weight: bold; -fx-text-fill: " + Constants.COLOR_BATTERY_HIGH + ";");
+            lblCleaned.setText("Temizlenen: %0.0");
+            lblTotalArea.setText("Toplam Alan: 0 m²");
+            lblRemainingArea.setText("Kalan Alan: 0 m² (%100.0)");
+        });
+    }
+
     // ─── Kullanmadığımız Observer Metotları (Gövdesi boş) ───
     @Override public void onRobotMoved(int newX, int newY, common.Direction direction) {}
     @Override public void onCellCleaned(int x, int y, DirtType dirtType) {}
     @Override public void onSimulationStarted() {}
     @Override public void onSimulationPaused() {}
-    @Override public void onSimulationReset() {}
 }

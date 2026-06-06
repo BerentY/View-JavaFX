@@ -13,7 +13,9 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Slider;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
 
 /**
  * Kullanıcı kontrollerini barındıran sağ panel.
@@ -30,9 +32,21 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
     private Button btnReturnStation;
 
     private ComboBox<String> comboAlgorithm;
-    private ComboBox<Double> comboSpeed;
 
-    // YENİ: Hücreye sol tıklandığında ne ekleneceğini seçen araçlar
+    // GÜNCELLEME: Hız ayarı artık ComboBox değil, Slider
+    private Slider sliderSpeed;
+    private Label lblSpeedValue;
+
+    // YENİ: Robot Durumu Gösterge Etiketleri
+    private Label lblRobotPos;
+    private Label lblRobotDir;
+    private Label lblRobotBattery;
+
+    // YENİ: Manuel Batarya Ayarlama Elemanları
+    private ComboBox<Integer> comboManualBattery;
+    private Button btnSetBattery;
+
+    // Hücreye sol tıklandığında ne ekleneceğini seçen araçlar
     private ToggleGroup toolGroup;
     private RadioButton rbObstacle;
     private RadioButton rbDust;
@@ -63,7 +77,7 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
 
         btnPause = new Button("Duraklat");
         btnPause.setMaxWidth(Double.MAX_VALUE);
-        btnPause.setDisable(true); // Başlangıçta pasif
+        btnPause.setDisable(true);
         btnPause.setOnAction(e -> controller.pauseSimulation());
 
         btnReset = new Button("Sıfırla");
@@ -74,7 +88,7 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
         btnReturnStation.setMaxWidth(Double.MAX_VALUE);
         btnReturnStation.setOnAction(e -> controller.returnToStation());
 
-        // ─── YENİ: ARAÇLAR (KİR / MOBİLYA EKLEME) ───
+        // ─── ARAÇLAR (KİR / MOBİLYA EKLEME) ───
         Label lblTools = new Label("Ekleme Aracı (Sol Tık)");
         lblTools.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
 
@@ -82,7 +96,7 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
 
         rbObstacle = new RadioButton("Mobilya (Engel)");
         rbObstacle.setToggleGroup(toolGroup);
-        rbObstacle.setSelected(true); // Varsayılan seçim
+        rbObstacle.setSelected(true);
 
         rbDust = new RadioButton("Toz Kiri (Sarı)");
         rbDust.setToggleGroup(toolGroup);
@@ -93,10 +107,22 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
         rbStain = new RadioButton("Leke Kiri (Kahve)");
         rbStain.setToggleGroup(toolGroup);
 
-        // Araçları dikey düzende hizalamak için küçük bir iç VBox
         VBox toolBox = new VBox(8, rbObstacle, rbDust, rbLiquid, rbStain);
         toolBox.setAlignment(Pos.CENTER_LEFT);
-        toolBox.setPadding(new Insets(0, 0, 0, 20)); // Biraz içten başlat şık dursun
+        toolBox.setPadding(new Insets(0, 0, 0, 20));
+
+        // ─── YENİ: ROBOT DURUMU GÖSTERGE PANELİ ───
+        Label lblStatusTitle = new Label("Robot Durumu");
+        lblStatusTitle.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+
+        lblRobotPos = new Label("Konum (x, y): (0, 0)");
+        lblRobotDir = new Label("Yön: Doğu (→)");
+        lblRobotBattery = new Label("Batarya: %100");
+        lblRobotBattery.setStyle("-fx-font-weight: bold; -fx-text-fill: " + Constants.COLOR_BATTERY_HIGH + ";");
+
+        VBox statusBox = new VBox(6, lblRobotPos, lblRobotDir, lblRobotBattery);
+        statusBox.setAlignment(Pos.CENTER_LEFT);
+        statusBox.setPadding(new Insets(0, 0, 0, 20));
 
         // ─── AYARLAR ───
         Label lblSettings = new Label("Ayarlar");
@@ -109,12 +135,39 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
         comboAlgorithm.setMaxWidth(Double.MAX_VALUE);
         comboAlgorithm.setOnAction(e -> controller.setAlgorithm(comboAlgorithm.getValue()));
 
-        Label lblSpeed = new Label("Hız (Çarpan):");
-        comboSpeed = new ComboBox<>();
-        comboSpeed.getItems().addAll(Constants.MIN_SPEED, Constants.DEFAULT_SPEED, 2.0, Constants.MAX_SPEED);
-        comboSpeed.setValue(Constants.DEFAULT_SPEED);
-        comboSpeed.setMaxWidth(Double.MAX_VALUE);
-        comboSpeed.setOnAction(e -> controller.setSpeed(comboSpeed.getValue()));
+        // GÜNCELLEME: ComboBox yerine Slider yapısı entegre edildi
+        Label lblSpeedTitle = new Label("Robot Hızı:");
+        lblSpeedValue = new Label(Constants.DEFAULT_SPEED + "x");
+        lblSpeedValue.setStyle("-fx-font-weight: bold;");
+        HBox speedLabelBox = new HBox(5, lblSpeedTitle, lblSpeedValue);
+
+        sliderSpeed = new Slider(Constants.MIN_SPEED, Constants.MAX_SPEED, Constants.DEFAULT_SPEED);
+        sliderSpeed.setShowTickMarks(true);
+        sliderSpeed.setShowTickLabels(false);
+        sliderSpeed.setMajorTickUnit(0.5);
+        sliderSpeed.setBlockIncrement(0.5);
+
+        // Kaydırıcı hareket ettikçe anlık olarak hızı Controller'a bildirir ve yazıyı günceller
+        sliderSpeed.valueProperty().addListener((observable, oldValue, newValue) -> {
+            double roundedSpeed = Math.round(newValue.doubleValue() * 2.0) / 2.0; // 0.5 katlarına yuvarla
+            sliderSpeed.setValue(roundedSpeed);
+            lblSpeedValue.setText(roundedSpeed + "x");
+            controller.setSpeed(roundedSpeed);
+        });
+
+        // YENİ: MANUEL BATARYA AYARLAMA BÖLÜMÜ
+        Label lblManualBattery = new Label("Manuel Batarya:");
+        comboManualBattery = new ComboBox<>();
+        for (int i = 10; i <= 100; i += 10) {
+            comboManualBattery.getItems().add(i);
+        }
+        comboManualBattery.setValue(100);
+
+        btnSetBattery = new Button("Ayarla");
+        btnSetBattery.setOnAction(e -> controller.setBattery(comboManualBattery.getValue()));
+
+        HBox batterySetBox = new HBox(5, comboManualBattery, btnSetBattery);
+        batterySetBox.setAlignment(Pos.CENTER_LEFT);
 
         // Tüm elemanları panele ekle
         getChildren().addAll(
@@ -122,18 +175,18 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
                 btnStart, btnPause, btnReset, btnReturnStation,
                 new Separator(),
                 lblTools,
-                toolBox, // Yeni ekleme araçları kutusu
+                toolBox,
+                new Separator(),
+                lblStatusTitle,
+                statusBox,
                 new Separator(),
                 lblSettings,
                 lblAlgo, comboAlgorithm,
-                lblSpeed, comboSpeed
+                speedLabelBox, sliderSpeed,
+                lblManualBattery, batterySetBox
         );
     }
 
-    /**
-     * YENİ: GridView'ın sol tıklandığında hangi aracın aktif olduğunu
-     * öğrenmesini sağlayan köprü metot.
-     */
     public String getSelectedTool() {
         if (rbDust.isSelected()) return "DUST";
         if (rbLiquid.isSelected()) return "LIQUID";
@@ -153,6 +206,12 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
 
             btnStart.setDisable(running && !paused);
             btnPause.setDisable(!running || paused);
+
+            // GÜNCELLEME: Anlık olarak robotun konumunu, yönünü ve bataryasını arayüze yansıt
+            lblRobotPos.setText(String.format("Konum (x, y): (%d, %d)", state.getRobotX(), state.getRobotY()));
+            lblRobotDir.setText("Yön: " + state.getDirection().getDisplayName());
+            lblRobotBattery.setText("Batarya: %" + state.getBattery());
+            lblRobotBattery.setStyle("-fx-font-weight: bold; -fx-text-fill: " + state.getBatteryColor() + ";");
 
             if (state.getActiveAlgorithm() != null && !comboAlgorithm.getValue().equals(state.getActiveAlgorithm())) {
                 comboAlgorithm.setValue(state.getActiveAlgorithm());
@@ -182,8 +241,16 @@ public class ControlPanel extends VBox implements Interfaces.SimulationObserver 
             btnStart.setDisable(false);
             btnPause.setDisable(true);
             comboAlgorithm.setValue(Constants.ALGO_RANDOM);
-            comboSpeed.setValue(Constants.DEFAULT_SPEED);
-            rbObstacle.setSelected(true); // Sıfırlanınca varsayılana dön
+            sliderSpeed.setValue(Constants.DEFAULT_SPEED);
+            lblSpeedValue.setText(Constants.DEFAULT_SPEED + "x");
+            comboManualBattery.setValue(100);
+            rbObstacle.setSelected(true);
+
+            // Başlangıç değerlerine geri döndür
+            lblRobotPos.setText("Konum (x, y): (0, 0)");
+            lblRobotDir.setText("Yön: Doğu (→)");
+            lblRobotBattery.setText("Batarya: %100");
+            lblRobotBattery.setStyle("-fx-font-weight: bold; -fx-text-fill: " + Constants.COLOR_BATTERY_HIGH + ";");
         });
     }
 

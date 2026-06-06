@@ -5,8 +5,7 @@ package view;
  */
 public class AppLauncher {
     public static void main(String[] args) {
-        // JavaFX'i kandırıyoruz: Doğrudan Application'ı değil,
-        // normal bir sınıf üzerinden Main sınıfını çağırıyoruz.
+        // Doğrudan Main sınıfını çağırıyoruz
         Main.main(args);
     }
 }

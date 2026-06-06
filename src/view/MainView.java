@@ -32,7 +32,7 @@ public class MainView extends BorderPane {
 
         // 5. BorderPane yerleşimi
         this.setCenter(gridView); //
-        this.setRight(controlPanel); //
+        this.setLeft(controlPanel); //
         this.setBottom(statusBar); //
     }
 }
